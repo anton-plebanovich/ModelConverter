@@ -1,5 +1,5 @@
 //
-//  main.m
+//  Converter.h
 //  ModelConverter
 //
 //  Created by mac-246 on 10.02.16.
@@ -7,11 +7,7 @@
 //
 
 #import <Foundation/Foundation.h>
-#import "Converter.h"
 
-int main(int argc, const char * argv[]) {
-    @autoreleasepool {
-        [Converter new];
-    }
-    return 0;
-}
+@interface Converter : NSObject
+
+@end
