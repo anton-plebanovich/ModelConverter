@@ -12,6 +12,7 @@
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
         [Converter new];
+        NSLog(@"Finished");
     }
     return 0;
 }

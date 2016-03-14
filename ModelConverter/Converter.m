@@ -24,7 +24,8 @@
 static NSString *androidProjectModelsPath = @"/Users/mac-246/Documents/Projects/rockspoon-pos/android-sdk/src/main/java/com/rockspoon/models"; // Where to find android models
 //static NSString *outputFolder = @"/Users/mac-246/Documents/Projects/rockspoon-models";
 //static NSString *outputFolder = @"/Users/mac-246/Documents/Projects Swift/test/test/rockspoon-models";
-static NSString *outputFolder = @"/Users/mac-246/Documents/Projects/rockspoon-ios/Models/Models/Source"; // Where to write converted models
+static NSString *outputFolder = @"/Users/mac-246/Documents/Projects/rockspoon-ios/Models/Models"; // Where to write converted models
+static NSString *outputFolder2 = @"/Users/mac-246/Documents/Projects/rockspoon-pos/android-sdk/src/main/java/com/rockspoon/swift-models";
 static const NSString *propertyTypeKey = @"propertyType";
 static const NSString *propertyNameKey = @"propertyName";
 static const NSString *propertyCommentKey = @"propertyComment";
@@ -33,6 +34,7 @@ static const NSString *propertyUnavailableKey = @"propertyUnavailable";
 
 @interface Converter ()
 @property (nonatomic) NSMutableSet *allEnumsNames;
+@property (nonatomic) NSArray *stringEnums;
 @end
 
 
@@ -43,6 +45,7 @@ static const NSString *propertyUnavailableKey = @"propertyUnavailable";
     if (!(self = [super init])) return nil;
     
     [[NSFileManager defaultManager] createDirectoryAtPath:outputFolder withIntermediateDirectories:YES attributes:nil error:nil];
+    _stringEnums = @[@"UserGender", @"Status", @"ItemCategory", @"FoodServiceType", @"ItemAvailability"];
     [self getEnumsNames];
     [self convertModels];
     
@@ -53,114 +56,106 @@ static const NSString *propertyUnavailableKey = @"propertyUnavailable";
 - (void)getEnumsNames {
     _allEnumsNames = [NSMutableSet set];
     
-    NSURL *directoryURL = [NSURL URLWithString:androidProjectModelsPath];
-    NSArray *keys = [NSArray arrayWithObjects: NSURLIsDirectoryKey, NSURLIsPackageKey, NSURLLocalizedNameKey, nil];
-    NSDirectoryEnumerator *enumerator = [[NSFileManager defaultManager] enumeratorAtURL:directoryURL includingPropertiesForKeys:keys options:(NSDirectoryEnumerationSkipsPackageDescendants | NSDirectoryEnumerationSkipsHiddenFiles) errorHandler:^(NSURL *url, NSError *error) {
-        // Handle the error.
-        // Return YES if the enumeration should continue after the error.
-        return YES;
-    }];
-    
-    for (NSURL *url in enumerator) {
-        NSNumber *isDirectory = nil;
-        [url getResourceValue:&isDirectory forKey:NSURLIsDirectoryKey error:NULL];
-        
-        if ([isDirectory boolValue]) {
-            NSString *localizedName = nil;
-            [url getResourceValue:&localizedName forKey:NSURLLocalizedNameKey error:NULL];
-            
-            NSNumber *isPackage = nil;
-            [url getResourceValue:&isPackage forKey:NSURLIsPackageKey error:NULL];
-            
-            if ([isPackage boolValue]) {
-                //                NSLog(@"Package at %@", localizedName);
-            }
-            else {
-                //                NSLog(@"Creating directory %@", localizedName);
-                NSString *relativePath = [url.path stringByReplacingOccurrencesOfString:androidProjectModelsPath withString:@""];
-                NSString *outputPath = [outputFolder stringByAppendingPathComponent:relativePath];
-                NSURL *directoryURL = [[NSURL alloc] initFileURLWithPath:outputPath isDirectory:YES];
-                [[NSFileManager defaultManager] createDirectoryAtURL:directoryURL withIntermediateDirectories:YES attributes:nil error:nil];
-            }
-        } else {
-            NSError *error = nil;
-            NSString *stringFromFileAtURL = [[NSString alloc] initWithContentsOfURL:url encoding:NSASCIIStringEncoding error:&error];
-            NSArray *components = [stringFromFileAtURL componentsSeparatedByString:@" enum "];
-            for (NSInteger i = 1; i < components.count; i++) {
-                NSString *currentComponent = components[i];
-                NSString *currentEnumName = [currentComponent componentsSeparatedByString:@" "][0];
-                [_allEnumsNames addObject:currentEnumName];
-            }
+    NSURL *baseUrl = [NSURL URLWithString:androidProjectModelsPath];
+    NSArray *files = [self getFilesUrls:baseUrl];
+    for (NSURL *currentUrl in files) {
+        NSError *error = nil;
+        NSString *stringFromFileAtURL = [[NSString alloc] initWithContentsOfURL:currentUrl encoding:NSASCIIStringEncoding error:&error];
+        NSArray *components = [stringFromFileAtURL componentsSeparatedByString:@" enum "];
+        for (NSInteger i = 1; i < components.count; i++) {
+            NSString *currentComponent = components[i];
+            NSString *currentEnumName = [currentComponent componentsSeparatedByString:@" "][0];
+            [_allEnumsNames addObject:currentEnumName];
         }
+    }
+}
+
+- (void)createDirrectories {
+    NSURL *directoryURL = [NSURL URLWithString:androidProjectModelsPath];
+    NSArray *dirrectories = [self getDirectoriesUrls:directoryURL];
+    for (NSURL *currentUrl in dirrectories) {
+        NSString *relativePath = [currentUrl.path stringByReplacingOccurrencesOfString:androidProjectModelsPath withString:@""];
+        NSString *outputPath = [outputFolder stringByAppendingPathComponent:relativePath];
+        NSURL *directoryURL = [[NSURL alloc] initFileURLWithPath:outputPath isDirectory:YES];
+        [[NSFileManager defaultManager] createDirectoryAtURL:directoryURL withIntermediateDirectories:YES attributes:nil error:nil];
     }
 }
 
 - (void)convertModels {
-    NSURL *directoryURL = [NSURL URLWithString:androidProjectModelsPath];
-    NSArray *keys = [NSArray arrayWithObjects: NSURLIsDirectoryKey, NSURLIsPackageKey, NSURLLocalizedNameKey, nil];
-    NSDirectoryEnumerator *enumerator = [[NSFileManager defaultManager] enumeratorAtURL:directoryURL includingPropertiesForKeys:keys options:(NSDirectoryEnumerationSkipsPackageDescendants | NSDirectoryEnumerationSkipsHiddenFiles) errorHandler:^(NSURL *url, NSError *error) {
-        // Handle the error.
-        // Return YES if the enumeration should continue after the error.
-        return YES;
-    }];
-    
-    for (NSURL *url in enumerator) {
-        NSNumber *isDirectory = nil;
-        [url getResourceValue:&isDirectory forKey:NSURLIsDirectoryKey error:NULL];
-        
-        if ([isDirectory boolValue]) {
-            NSString *localizedName = nil;
-            [url getResourceValue:&localizedName forKey:NSURLLocalizedNameKey error:NULL];
-            
-            NSNumber *isPackage = nil;
-            [url getResourceValue:&isPackage forKey:NSURLIsPackageKey error:NULL];
-            
-            if ([isPackage boolValue]) {
-//                NSLog(@"Package at %@", localizedName);
-            }
-            else {
-//                NSLog(@"Creating directory %@", localizedName);
-                NSString *relativePath = [url.path stringByReplacingOccurrencesOfString:androidProjectModelsPath withString:@""];
-                NSString *outputPath = [outputFolder stringByAppendingPathComponent:relativePath];
-                NSURL *directoryURL = [[NSURL alloc] initFileURLWithPath:outputPath isDirectory:YES];
-                [[NSFileManager defaultManager] createDirectoryAtURL:directoryURL withIntermediateDirectories:YES attributes:nil error:nil];
-            }
-        } else {
-            [self convertFile:url];
-            
-//            NSLog(@"File at %@", localizedName);
-        }
+    NSURL *baseUrl = [NSURL URLWithString:androidProjectModelsPath];
+    NSArray *files = [self getFilesUrls:baseUrl];
+    for (NSURL *currentUrl in files) {
+        [self convertFile:currentUrl];
     }
 }
 
 - (void)convertFile:(NSURL *)fileURL {
-//    NSLog(@"Converting %@", fileURL.lastPathComponent);
     NSString *outputString = nil;
     
     NSError *error;
     NSString *stringFromFileAtURL = [[NSString alloc] initWithContentsOfURL:fileURL encoding:NSASCIIStringEncoding error:&error];
-    if (stringFromFileAtURL == nil) {
-        // an error occurred
-        //                NSLog(@"Error reading file at %@\n%@", url, [error localizedFailureReason]);
-    } else {
+    if (stringFromFileAtURL != nil) {
         // PARSING
         if ([stringFromFileAtURL containsString:@" class "]) {
             // Parse as class
             outputString = [self parseStringAsClass:stringFromFileAtURL];
             // WRITTING
-            NSString *newFileName = [NSString stringWithFormat:@"%@.swift", [self getClassName:stringFromFileAtURL]];
-            [self writeString:outputString originalFileURL:fileURL newFileName:newFileName];
+            if (outputString) {
+                NSString *newFileName = [NSString stringWithFormat:@"%@.swift", [self getClassName:stringFromFileAtURL]];
+                [self writeString:outputString originalFileURL:fileURL newFileName:newFileName];
+            }
         } else if ([stringFromFileAtURL containsString:@" enum "]) {
             // Parse as enum
             outputString = [self parseStringAsEnum:stringFromFileAtURL];
             // WRITTING
-            NSString *newFileName = [NSString stringWithFormat:@"%@.swift", [self getEnumName:stringFromFileAtURL]];
-            [self writeString:outputString originalFileURL:fileURL newFileName:newFileName];
+            if (outputString) {
+                NSString *newFileName = [NSString stringWithFormat:@"%@.swift", [self getEnumName:stringFromFileAtURL]];
+                [self writeString:outputString originalFileURL:fileURL newFileName:newFileName];
+            }
         }
     }
 }
 
-# pragma mark Helpers
+#pragma mark Helpers
+- (NSArray *)getFilesUrls:(NSURL *)baseUrl {
+    NSArray *keys = [NSArray arrayWithObjects: NSURLIsDirectoryKey, NSURLIsPackageKey, NSURLLocalizedNameKey, nil];
+    NSDirectoryEnumerator *enumerator = [[NSFileManager defaultManager] enumeratorAtURL:baseUrl includingPropertiesForKeys:keys options:(NSDirectoryEnumerationSkipsPackageDescendants | NSDirectoryEnumerationSkipsHiddenFiles) errorHandler:^(NSURL *url, NSError *error) { return YES; }];
+    
+    NSMutableArray *filesUrls = [NSMutableArray array];
+    for (NSURL *url in enumerator) {
+        NSNumber *isDirectory = nil;
+        [url getResourceValue:&isDirectory forKey:NSURLIsDirectoryKey error:NULL];
+        
+        if (![isDirectory boolValue]) {
+            [filesUrls addObject:url];
+        }
+    }
+    
+    return filesUrls;
+}
+
+- (NSArray *)getDirectoriesUrls:(NSURL *)baseUrl {
+    NSArray *keys = [NSArray arrayWithObjects: NSURLIsDirectoryKey, NSURLIsPackageKey, NSURLLocalizedNameKey, nil];
+    NSDirectoryEnumerator *enumerator = [[NSFileManager defaultManager] enumeratorAtURL:baseUrl includingPropertiesForKeys:keys options:(NSDirectoryEnumerationSkipsPackageDescendants | NSDirectoryEnumerationSkipsHiddenFiles) errorHandler:^(NSURL *url, NSError *error) { return YES; }];
+    
+    NSMutableArray *directoriesUrl = [NSMutableArray array];
+    for (NSURL *url in enumerator) {
+        NSNumber *isDirectory = nil;
+        [url getResourceValue:&isDirectory forKey:NSURLIsDirectoryKey error:NULL];
+        
+        if ([isDirectory boolValue]) {
+            NSNumber *isPackage = nil;
+            [url getResourceValue:&isPackage forKey:NSURLIsPackageKey error:NULL];
+            
+            if (![isPackage boolValue]) {
+                [directoriesUrl addObject:url];
+            }
+        }
+    }
+    
+    return directoriesUrl;
+}
+
 - (NSString *)intendString:(NSString *)string spaces:(NSString *)spaces {
     NSArray *components = [string componentsSeparatedByString:@"\n"];
     NSMutableArray *intentedComponents = [NSMutableArray arrayWithCapacity:components.count];
@@ -182,20 +177,23 @@ static const NSString *propertyUnavailableKey = @"propertyUnavailable";
         newFileName = originalFileURL.lastPathComponent;
     }
     
-    NSString *relativePath = [originalFileURL.path stringByReplacingOccurrencesOfString:androidProjectModelsPath withString:@""];
-    relativePath = [relativePath stringByReplacingOccurrencesOfString:relativePath.lastPathComponent withString:newFileName];
-    relativePath = [relativePath stringByReplacingOccurrencesOfString:@".java" withString:@".swift"];
-    NSString *outputPath = [outputFolder stringByAppendingPathComponent:relativePath];
+    newFileName = [newFileName stringByReplacingOccurrencesOfString:@".java" withString:@".swift"];
+    NSString *outputPath = [outputFolder stringByAppendingPathComponent:newFileName];
     NSURL *outputURL = [[NSURL alloc] initFileURLWithPath:outputPath isDirectory:NO];
-    
-    NSError *error;
-    BOOL ok = [stringToWrite writeToURL:outputURL atomically:YES encoding:NSUTF8StringEncoding error:&error];
-    if (!ok) {
-        // an error occurred
-        NSLog(@"Error writing file at %@\n%@", outputURL, [error localizedFailureReason]);
-    } else {
-        //        NSLog(@"Success");
-    }
+    [self writeString:stringToWrite fileURL:outputURL];
+
+    NSString *outputPath2 = [outputFolder2 stringByAppendingPathComponent:newFileName];
+    NSURL *outputURL2 = [[NSURL alloc] initFileURLWithPath:outputPath2 isDirectory:NO];
+    [self writeString:stringToWrite fileURL:outputURL2];
+}
+
+- (void)writeString:(NSString *)stringToWrite fileURL:(NSURL *)urlToWrite {
+  NSError *error;
+  BOOL ok = [stringToWrite writeToURL:urlToWrite atomically:YES encoding:NSUTF8StringEncoding error:&error];
+  if (!ok) {
+    // an error occurred
+    NSLog(@"Error writing file at %@\n%@", urlToWrite, [error localizedFailureReason]);
+  }
 }
 
 - (NSString *)titleStringWithName:(NSString *)name {
@@ -277,6 +275,9 @@ static const NSString *propertyUnavailableKey = @"propertyUnavailable";
     }
     
     NSArray *propertiesArray = [self parsePropertiesArray:validValues];
+    if (!propertiesArray.count) {
+        return nil;
+    }
     NSString *classObjectString = [self createClassObjectStringWithName:className propertiesArray:propertiesArray innerEnums:innerEnumsStrings];
     
     return classObjectString;
@@ -355,8 +356,13 @@ static const NSString *propertyUnavailableKey = @"propertyUnavailable";
         NSString *propertyNameString = [[tempString componentsSeparatedByString:@" "] lastObject];
         
         // Getting type
-        NSString *typeString = [tempString stringByReplacingOccurrencesOfString:propertyNameString withString:@""];
-        typeString = [self convertTypeName:typeString];
+        NSString *typeString;
+        if ([propertyNameString isEqualToString:@"id"]) {
+            typeString = @"Int";
+        } else {
+            typeString = [tempString stringByReplacingOccurrencesOfString:propertyNameString withString:@""];
+            typeString = [self convertTypeName:typeString];
+        }
         
         NSMutableDictionary *propertyDictionary = [NSMutableDictionary dictionary];
         if (typeString.length) {
@@ -399,9 +405,8 @@ static const NSString *propertyUnavailableKey = @"propertyUnavailable";
     convertedTypeName = [convertedTypeName stringByReplacingOccurrencesOfString:@"Date" withString:@"NSDate"];
     convertedTypeName = [convertedTypeName stringByReplacingOccurrencesOfString:@"Timestamp" withString:@"NSDate"];
     convertedTypeName = [convertedTypeName stringByReplacingOccurrencesOfString:@"UUID" withString:@"NSUUID"];
-    convertedTypeName = [convertedTypeName stringByReplacingOccurrencesOfString:@"List<" withString:@"Array<"];
-    convertedTypeName = [convertedTypeName stringByReplacingOccurrencesOfString:@"Map<" withString:@"Dictionary<"];
     convertedTypeName = [convertedTypeName stringByReplacingOccurrencesOfString:@"Object" withString:@"AnyObject"];
+    convertedTypeName = [self convertComplexTypes:convertedTypeName];
     
     // Removing excess spaces
     NSInteger length = convertedTypeName.length;
@@ -418,11 +423,51 @@ static const NSString *propertyUnavailableKey = @"propertyUnavailable";
     return convertedTypeName;
 }
 
+- (NSString *)convertComplexTypes:(NSString *)typeName {
+    NSString *convertedTypeName = typeName;
+    
+    // Converting List -> []
+    while ([convertedTypeName containsString:@"List<"]) {
+        NSArray *listSplittedComponents = [convertedTypeName componentsSeparatedByString:@"List<"];
+        NSArray *lessSymbolComponentsAfterList = [listSplittedComponents[1] componentsSeparatedByString:@"<"];
+        NSInteger innerTypeBraces = lessSymbolComponentsAfterList.count - 1;
+        NSArray *moreSymbolComponentsAfterList = [listSplittedComponents[1] componentsSeparatedByString:@">"];
+        NSMutableString *innerType = [NSMutableString stringWithString:moreSymbolComponentsAfterList[0]];
+        for (NSInteger i = 0; i < innerTypeBraces; i++) {
+            NSString *component = moreSymbolComponentsAfterList[i+1];
+            [innerType addNextPart:@">" with:component];
+        }
+        NSString *oldListString = [NSString stringWithFormat:@"List<%@>", innerType];
+        NSString *newListString = [NSString stringWithFormat:@"[%@]", innerType];
+        convertedTypeName = [convertedTypeName stringByReplacingOccurrencesOfString:oldListString withString:newListString];
+    }
+    
+    // converting Map -> [:]
+    while ([convertedTypeName containsString:@"Map<"]) {
+        NSArray *mapSplittedComponents = [convertedTypeName componentsSeparatedByString:@"Map<"];
+        NSArray *lessSymbolComponentsBeforeMap = [mapSplittedComponents[0] componentsSeparatedByString:@"<"];
+        NSInteger multiplicity = lessSymbolComponentsBeforeMap.count - 1;
+        NSArray *moreSymbolComponentsAfterMap = [mapSplittedComponents[1] componentsSeparatedByString:@">"];
+        NSString *innerType = moreSymbolComponentsAfterMap[multiplicity];
+        
+        NSString *oldListString = [NSString stringWithFormat:@"Map<%@>", innerType];
+        NSString *newListString = [NSString stringWithFormat:@"[%@]", innerType];
+        newListString = [newListString stringByReplacingOccurrencesOfString:@" " withString:@""];
+        newListString = [newListString stringByReplacingOccurrencesOfString:@"," withString:@": "];
+        convertedTypeName = [convertedTypeName stringByReplacingOccurrencesOfString:oldListString withString:newListString];
+    }
+    
+    return convertedTypeName;
+}
+
 - (NSString *)createClassObjectStringWithName:(NSString *)className propertiesArray:(NSArray *)propertiesArray innerEnums:(NSArray *)innerEnumsStrings {
     NSMutableString *classObjectSting = [NSMutableString string];
     NSString *titleString = [self titleStringWithName:className];
     [classObjectSting addNextPart:titleString with:@"\n\n"];
-    
+  
+    NSString *swiftlintDisableString = @"// swiftlint:disable line_length";
+    [classObjectSting addNextPart:swiftlintDisableString with:@"\n"];
+  
     NSString *importString = @"import Foundation";
     [classObjectSting addNextPart:importString with:@"\n\n"];
     
@@ -432,55 +477,55 @@ static const NSString *propertyUnavailableKey = @"propertyUnavailable";
     NSString *privateConstantsString = [self privateConstatnsStringWithPropertiesArray:propertiesArray];
     [classObjectSting addNextPart:privateConstantsString with:@"\n\n"];
     
-    NSString *classDeclarationString = [NSString stringWithFormat:@"public class %@: NSObject, NSCoding {", className];
-    [classObjectSting addNextPart:classDeclarationString with:@"\n    \n"];
+    NSString *classDeclarationString = [NSString stringWithFormat:@"public final class %@: NSObject, NSCoding {", className];
+    [classObjectSting addNextPart:classDeclarationString with:@"\n  \n"];
     
     if (innerEnumsStrings.count) {
-        NSString *innerEnumsCommentString = [self commentsWithText:@"Inner enums" spaces:@"    "];
-        [classObjectSting addNextPart:innerEnumsCommentString with:@"\n    \n"];
+        NSString *innerEnumsCommentString = [self commentsWithText:@"Inner enums" spaces:@"  "];
+        [classObjectSting addNextPart:innerEnumsCommentString with:@"\n  \n"];
         
         for (NSString *enumString in innerEnumsStrings) {
-            NSString *intendedEnumString = [self intendString:enumString spaces:@"    "];
-            [classObjectSting addNextPart:intendedEnumString with:@"\n    \n"];
+            NSString *intendedEnumString = [self intendString:enumString spaces:@"  "];
+            [classObjectSting addNextPart:intendedEnumString with:@"\n  \n"];
         }
     }
     
-    NSString *publicPropertiesCommentString = [self commentsWithText:@"Public properties" spaces:@"    "];
-    [classObjectSting addNextPart:publicPropertiesCommentString with:@"\n    \n"];
+    NSString *publicPropertiesCommentString = [self commentsWithText:@"Public properties" spaces:@"  "];
+    [classObjectSting addNextPart:publicPropertiesCommentString with:@"\n  \n"];
     
     NSString *publicPropertiesString = [self publicPropertiesStringWithPropertiesArray:propertiesArray];
-    [classObjectSting addNextPart:publicPropertiesString with:@"\n    \n"];
+    [classObjectSting addNextPart:publicPropertiesString with:@"\n  \n"];
     
-    NSString *initializersCommentString = [self commentsWithText:@"Initializers" spaces:@"    "];
-    [classObjectSting addNextPart:initializersCommentString with:@"\n    \n"];
+    NSString *initializersCommentString = [self commentsWithText:@"Initializers" spaces:@"  "];
+    [classObjectSting addNextPart:initializersCommentString with:@"\n  \n"];
     
-    NSString *publicinitString = @"    public override init() {\n        \n    }";
-    [classObjectSting addNextPart:publicinitString with:@"\n    \n"];
+    NSString *publicinitString = @"  public override init() {\n    \n  }";
+    [classObjectSting addNextPart:publicinitString with:@"\n  \n"];
     
-    NSString *nscodingCommentsString = [self commentsWithText:@"NSCoding" spaces:@"    "];
-    [classObjectSting addNextPart:nscodingCommentsString with:@"\n    \n"];
+    NSString *nscodingCommentsString = [self commentsWithText:@"NSCoding" spaces:@"  "];
+    [classObjectSting addNextPart:nscodingCommentsString with:@"\n  \n"];
     
-    NSString *initDeclarationString = @"    public required init?(coder aDecoder: NSCoder) {";
+    NSString *initDeclarationString = @"  public required init?(coder aDecoder: NSCoder) {";
     [classObjectSting addNextPart:initDeclarationString with:@"\n"];
     
     NSString *initString = [self initmethodStringWithPropertiesArray:propertiesArray];
     [classObjectSting addNextPart:initString with:@"\n"];
     
-    NSString *initCloseString = @"    }";
-    [classObjectSting addNextPart:initCloseString with:@"\n    \n"];
+    NSString *initCloseString = @"  }";
+    [classObjectSting addNextPart:initCloseString with:@"\n  \n"];
     
-    NSString *encodeDeclarationString = @"    public func encodeWithCoder(aCoder: NSCoder) {";
+    NSString *encodeDeclarationString = @"  public func encodeWithCoder(aCoder: NSCoder) {";
     [classObjectSting addNextPart:encodeDeclarationString with:@"\n"];
     
     NSString *encodeString = [self encodeStringWithPropertiesArray:propertiesArray];
     [classObjectSting addNextPart:encodeString with:@"\n"];
     
-    NSString *encdodeCloseString = @"    }";
+    NSString *encdodeCloseString = @"  }";
     [classObjectSting addNextPart:encdodeCloseString with:@"\n"];
     
     NSString *classCloseString = @"}";
     [classObjectSting addNextPart:classCloseString with:@"\n"];
-    
+  
     return classObjectSting;
 }
 
@@ -536,7 +581,7 @@ static const NSString *propertyUnavailableKey = @"propertyUnavailable";
         NSString *currentPropertyComment = currentProperty[propertyCommentKey];
         NSNumber *currentPropertyUnavailable = currentProperty[propertyUnavailableKey];
         
-        NSString *currentLine = [NSString stringWithFormat:@"    public var %@: %@?", currentPropertyName, currentPropertyType];
+        NSString *currentLine = [NSString stringWithFormat:@"  public var %@: %@?", currentPropertyName, currentPropertyType];
         if (currentPropertyComment) {
             currentLine = [NSString stringWithFormat:@"%@ // %@", currentLine, currentPropertyComment];
         }
@@ -576,16 +621,20 @@ static const NSString *propertyUnavailableKey = @"propertyUnavailable";
             }
         }
         if (isEnumArray) {
-            currentLine = [NSString stringWithFormat:@"        %@ = %@.convertFromIntArray(aDecoder.decodeObjectForKey(%@Key) as? [Int])", currentPropertyName, currentPropertyArrayType, currentPropertyName];
+          if ([_stringEnums containsObject:currentPropertyArrayType]) {
+            currentLine = [NSString stringWithFormat:@"    %@ = enumsArrayFromArray(aDecoder.decodeObjectForKey(%@Key) as? [String])", currentPropertyName, currentPropertyName];
+          } else {
+            currentLine = [NSString stringWithFormat:@"    %@ = enumsArrayFromArray(aDecoder.decodeObjectForKey(%@Key) as? [Int])", currentPropertyName, currentPropertyName];
+          }
         } else if (isEnum) {
-            currentLine = [NSString stringWithFormat:@"        %@ = %@(aDecoder.decodeObjectForKey(%@Key)", currentPropertyName, currentPropertyType, currentPropertyName];
+            currentLine = [NSString stringWithFormat:@"    %@ = %@(aDecoder.decodeObjectForKey(%@Key)", currentPropertyName, currentPropertyType, currentPropertyName];
             if ([self isStringEnum:currentPropertyType]) {
                 currentLine = [NSString stringWithFormat:@"%@ as? String)", currentLine];
             } else {
                 currentLine = [NSString stringWithFormat:@"%@ as? Int)", currentLine];
             }
         } else {
-            currentLine = [NSString stringWithFormat:@"        %@ = aDecoder.decodeObjectForKey(%@Key)", currentPropertyName, currentPropertyName];
+            currentLine = [NSString stringWithFormat:@"    %@ = aDecoder.decodeObjectForKey(%@Key)", currentPropertyName, currentPropertyName];
             if (![currentPropertyType isEqualToString:@"AnyObject"]) {
                 currentLine = [currentLine stringByAppendingString:[NSString stringWithFormat:@" as? %@", currentPropertyType]];
             }
@@ -626,11 +675,11 @@ static const NSString *propertyUnavailableKey = @"propertyUnavailable";
             }
         }
         if (isEnumArray) {
-            currentLine = [NSString stringWithFormat:@"        aCoder.encodeObject(%@.convertToIntArray(%@), forKey: %@Key)", currentPropertyArrayType, currentPropertyName, currentPropertyName];
+              currentLine = [NSString stringWithFormat:@"    aCoder.encodeObject(arrayFromEnumsArray(%@), forKey: %@Key)", currentPropertyName, currentPropertyName];
         } else if (isEnum) {
-            currentLine = [NSString stringWithFormat:@"        aCoder.encodeObject(%@?.rawValue, forKey: %@Key)", currentPropertyName, currentPropertyName];
+            currentLine = [NSString stringWithFormat:@"    aCoder.encodeObject(%@?.rawValue, forKey: %@Key)", currentPropertyName, currentPropertyName];
         } else {
-            currentLine = [NSString stringWithFormat:@"        aCoder.encodeObject(%@, forKey: %@Key)", currentPropertyName, currentPropertyName];
+            currentLine = [NSString stringWithFormat:@"    aCoder.encodeObject(%@, forKey: %@Key)", currentPropertyName, currentPropertyName];
         }
         
         if ([currentPropertyUnavailable isEqualToNumber:@YES]) {
@@ -703,9 +752,9 @@ static const NSString *propertyUnavailableKey = @"propertyUnavailable";
     
     NSString *declarationString = nil;
     if ([self isStringEnum:enumName]) {
-        declarationString = [NSString stringWithFormat:@"public enum %@: String {", enumName];
+        declarationString = [NSString stringWithFormat:@"public enum %@: String, EVRawString, StringEnumInit {", enumName];
     } else {
-        declarationString = [NSString stringWithFormat:@"public enum %@: Int {", enumName];
+        declarationString = [NSString stringWithFormat:@"public enum %@: Int, EVRawInt, IntEnumInit {", enumName];
     }
     [enumString addNextPart:declarationString with:@"\n"];
     
@@ -713,25 +762,35 @@ static const NSString *propertyUnavailableKey = @"propertyUnavailable";
     for (NSString *currentValueString in valuesArray) {
         NSString *normalizedEnumString = [self normalizeEnumString:currentValueString];
         NSString *caseString = [NSString stringWithFormat:@"%@%@", [[normalizedEnumString substringToIndex:1] uppercaseString], [normalizedEnumString substringFromIndex:1]];
-        caseString = [NSString stringWithFormat:@"    case %@", caseString];
+        if ([self isStringEnum:enumName]) {
+            caseString = [NSString stringWithFormat:@"  case %@ = \"%@\"", caseString, currentValueString];
+        } else {
+            caseString = [NSString stringWithFormat:@"  case %@", caseString];
+        }
         [enumValuesStrings addObject:caseString];
     }
     NSString *casesString = [enumValuesStrings componentsJoinedByString:@"\n"];
     [enumString addNextPart:casesString with:@"\n\n"];
     
-    if (![self isStringEnum:enumName]) {
-        NSString *convertFromIntArrayString = [NSString stringWithFormat:@"    static func convertFromIntArray(intArray: [Int]?) -> [%@] {\n        guard let intArray = intArray else { return [] }\n        var enumArray = [%@]()\n        for currentValue: Int in intArray {\n            let currentEnum = %@(currentValue)\n            if let currentEnum = currentEnum {\n                enumArray.append(currentEnum)\n            }\n        }\n        \n        return enumArray\n    }", enumName, enumName, enumName];
+    if ([self isStringEnum:enumName]) {
+        NSString *convertFromStringArrayString = [NSString stringWithFormat:@"    static func convertFromStringArray(stringArray: [String]?) -> [%@] {\n      guard let stringArray = stringArray else { return [] }\n      var enumArray = [%@]()\n      for currentValue: String in stringArray {\n        let currentEnum = %@(currentValue)\n        if let currentEnum = currentEnum {\n          enumArray.append(currentEnum)\n        }\n      }\n\n      return enumArray\n    }", enumName, enumName, enumName];
+        [enumString addNextPart:convertFromStringArrayString with:@"\n\n"];
+
+        NSString *convertToStringArrayString = [NSString stringWithFormat:@"    static func convertToStringArray(enumArray: [%@]?) -> [String] {\n      guard let enumArray = enumArray else { return [] }\n      var stringArray = [String]()\n      for currentValue: %@ in enumArray {\n        let currentString = currentValue.rawValue\n        stringArray.append(currentString)\n      }\n\n      return stringArray\n    }", enumName, enumName];
+        [enumString addNextPart:convertToStringArrayString with:@"\n\n"];
+    } else {
+        NSString *convertFromIntArrayString = [NSString stringWithFormat:@"  static func convertFromIntArray(intArray: [Int]?) -> [%@] {\n    guard let intArray = intArray else { return [] }\n    var enumArray = [%@]()\n    for currentValue: Int in intArray {\n      let currentEnum = %@(currentValue)\n      if let currentEnum = currentEnum {\n        enumArray.append(currentEnum)\n      }\n    }\n    \n    return enumArray\n  }", enumName, enumName, enumName];
         [enumString addNextPart:convertFromIntArrayString with:@"\n\n"];
         
-        NSString *convertToIntArrayString = [NSString stringWithFormat:@"    static func convertToIntArray(enumArray: [%@]?) -> [Int] {\n        guard let enumArray = enumArray else { return [] }\n        var intArray = [Int]()\n        for currentValue: %@ in enumArray {\n            let currentInt = currentValue.rawValue\n            intArray.append(currentInt)\n        }\n        \n        return intArray\n    }", enumName, enumName];
+        NSString *convertToIntArrayString = [NSString stringWithFormat:@"  static func convertToIntArray(enumArray: [%@]?) -> [Int] {\n    guard let enumArray = enumArray else { return [] }\n    var intArray = [Int]()\n    for currentValue: %@ in enumArray {\n      let currentInt = currentValue.rawValue\n      intArray.append(currentInt)\n    }\n    \n    return intArray\n  }", enumName, enumName];
         [enumString addNextPart:convertToIntArrayString with:@"\n\n"];
     }
     
     NSString *initString = nil;
     if ([self isStringEnum:enumName]) {
-        initString = [NSString stringWithFormat:@"    public init?(_ value: String?) {\n        guard let v = value, let e = %@(rawValue: v) else { return nil }\n        self = e\n    }\n}", enumName];
+        initString = [NSString stringWithFormat:@"  public init?(_ value: String?) {\n    guard let v = value, let e = %@(rawValue: v) else { return nil }\n    self = e\n  }\n}", enumName];
     } else {
-        initString = [NSString stringWithFormat:@"    public init?(_ value: Int?) {\n        guard let v = value, let e = %@(rawValue: v) else { return nil }\n        self = e\n    }\n}", enumName];
+        initString = [NSString stringWithFormat:@"  public init?(_ value: Int?) {\n    guard let v = value, let e = %@(rawValue: v) else { return nil }\n    self = e\n  }\n}", enumName];
     }
     [enumString addNextPart:initString with:@"\n"];
     
@@ -765,8 +824,11 @@ static const NSString *propertyUnavailableKey = @"propertyUnavailable";
 
 - (BOOL)isStringEnum:(NSString *)enumName {
     BOOL stringEnum = NO;
-    if ([enumName isEqualToString:@"UserGender"]) {
-        stringEnum = YES;
+    for (NSString *currentStringEnum in _stringEnums) {
+        if ([currentStringEnum isEqualToString:enumName]) {
+            stringEnum = YES;
+            break;
+        }
     }
     
     return stringEnum;
